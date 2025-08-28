@@ -78,17 +78,25 @@ func showWelcomeMessage(ctx *ext.Context, u *ext.Update) {
         })
 }
 
-func checkChannelMembership(ctx *ext.Context, userId int64, channelUsername string) bool {
-        // Get channel info
-        channelPeer := &tg.InputPeerUsername{Username: channelUsername}
-        
-        // Check if user is member of the channel
-        req := &tg.ChannelsGetParticipantRequest{
-                Channel: channelPeer,
-                UserID:  &tg.InputUserID{UserID: userId},
+func checkChannelMembership(ctx *ext.Context, userId int64) bool {
+        // Get channel peer by username
+        channelPeer := &tg.InputPeerUsername{
+                Username: "KaIi_Bots",
         }
         
-        _, err := ctx.Raw().ChannelsGetParticipant(ctx, req)
+        // Create user input peer
+        userPeer := &tg.InputPeerUser{
+                UserID:     userId,
+                AccessHash: 0, // Will be resolved by the library
+        }
+        
+        // Try to get participant info
+        req := &tg.ChannelsGetParticipantRequest{
+                Channel:     channelPeer,
+                Participant: userPeer,
+        }
+        
+        _, err := ctx.API().ChannelsGetParticipant(ctx, req)
         if err != nil {
                 // User is not a member
                 return false
@@ -111,7 +119,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
         switch callbackData {
         case "check_membership":
                 // Check if user is member of the channel
-                isMember := checkChannelMembership(ctx, userId, "KaIi_Bots")
+                isMember := checkChannelMembership(ctx, userId)
                 
                 if !isMember {
                         // User is not a member - show alert
