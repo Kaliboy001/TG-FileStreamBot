@@ -1,79 +1,68 @@
 package commands
 
 import (
-	"EverythingSuckz/fsb/config"
-	"EverythingSuckz/fsb/internal/utils"
+        "EverythingSuckz/fsb/config"
+        "EverythingSuckz/fsb/internal/utils"
 
-	"github.com/celestix/gotgproto/dispatcher"
-	"github.com/celestix/gotgproto/dispatcher/handlers"
-	"github.com/celestix/gotgproto/ext"
-	"github.com/celestix/gotgproto/storage"
-	"github.com/gotd/td/tg"
+        "github.com/celestix/gotgproto/dispatcher"
+        "github.com/celestix/gotgproto/dispatcher/handlers"
+        "github.com/celestix/gotgproto/ext"
+        "github.com/celestix/gotgproto/storage"
+        "github.com/gotd/td/tg"
 )
 
-// Register the start command and callback query handler
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
-	log := m.log.Named("start")
-	defer log.Sugar().Info("Loaded")
-	dispatcher.AddHandler(handlers.NewCommand("start", startHandler))
-	dispatcher.AddHandler(handlers.NewMessage(devButtonCallbackFilter, devButtonCallback))
+        log := m.log.Named("start")
+        defer log.Sugar().Info("Loaded")
+        dispatcher.AddHandler(handlers.NewCommand("start", start))
+        dispatcher.AddHandler(handlers.NewCallbackQuery(nil, handleDevCallback))
 }
 
-// The filter must match func(u *ext.Update) bool
-func devButtonCallbackFilter(u *ext.Update) bool {
-	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info"
+func start(ctx *ext.Context, u *ext.Update) error {
+        chatId := u.EffectiveChat().GetID()
+        peerChatId := ctx.PeerStorage.GetPeerById(chatId)
+        if peerChatId.Type != int(storage.TypeUser) {
+                return dispatcher.EndGroups
+        }
+        if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
+                ctx.Reply(u, "You are not allowed to use this bot.", nil)
+                return dispatcher.EndGroups
+        }
+        // Create inline keyboard with Dev button
+        markup := &tg.ReplyInlineMarkup{
+                Rows: []tg.KeyboardButtonRow{
+                        {
+                                Buttons: []tg.KeyboardButtonClass{
+                                        &tg.KeyboardButtonCallback{
+                                                Text: "Dev",
+                                                Data: []byte("dev_info"),
+                                        },
+                                },
+                        },
+                },
+        }
+        
+        ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
+                Markup: markup,
+        })
+        return dispatcher.EndGroups
 }
 
-// /start command handler: sends greeting and inline button
-func startHandler(ctx *ext.Context, u *ext.Update) error {
-	chatId := u.EffectiveChat().GetID()
-	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
-	if peerChatId.Type != int(storage.TypeUser) {
-		return dispatcher.EndGroups
-	}
-	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
-		ctx.Reply(u, "You are not allowed to use this bot.", nil)
-		return dispatcher.EndGroups
-	}
-
-	row := tg.KeyboardButtonRow{
-		Buttons: []tg.KeyboardButtonClass{
-			&tg.KeyboardButtonCallback{
-				Text: "Dev",
-				Data: []byte("dev_info"),
-			},
-		},
-	}
-	markup := &tg.ReplyInlineMarkup{
-		Rows: []tg.KeyboardButtonRow{row},
-	}
-
-	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
-		Markup: markup,
-	})
-
-	return dispatcher.EndGroups
-}
-
-// Handler for the callback query ("Dev" button) - sends a new message
-func devButtonCallback(ctx *ext.Context, u *ext.Update) error {
-	cb := u.CallbackQuery
-	if cb == nil {
-		return dispatcher.EndGroups
-	}
-
-	// Remove loading animation with correct request type
-	req := &tg.MessagesSetBotCallbackAnswerRequest{
-		QueryID: cb.QueryID,
-	}
-	_, _ = ctx.AnswerCallback(req)
-
-	chatId := u.EffectiveChat().GetID()
-	inputPeer := ctx.PeerStorage.GetInputPeerById(chatId)
-
-	_, err := ctx.SendMessage(chatId, &tg.MessagesSendMessageRequest{
-		Peer:    inputPeer,
-		Message: "This bot Developed by @Kaliboy002",
-	})
-	return err
+func handleDevCallback(ctx *ext.Context, u *ext.Update) error {
+        // Get the callback query data
+        callbackQuery := u.CallbackQuery
+        if callbackQuery == nil {
+                return dispatcher.EndGroups
+        }
+        
+        // Check if this is the "dev_info" callback
+        if string(callbackQuery.Data) == "dev_info" {
+                // Answer the callback query to remove the loading state
+                ctx.AnswerCallback(callbackQuery, nil)
+                
+                // Send the developer info message
+                ctx.SendMessage(u.EffectiveChat().GetID(), "This bot developed by @Kaliboy002", nil)
+        }
+        
+        return dispatcher.EndGroups
 }
