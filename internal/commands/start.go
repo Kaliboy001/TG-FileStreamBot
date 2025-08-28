@@ -8,11 +8,8 @@ import (
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
-	"github.com/celestix/gotgproto/mtproto"
-	"github.com/celestix/gotgproto/mtproto/types"
 )
 
-// Register both command and callback handlers
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
@@ -20,7 +17,6 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	dispatcher.AddHandler(handlers.NewCallback(callbackDev, "dev_info"))
 }
 
-// /start command handler with inline button
 func start(ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
@@ -32,26 +28,17 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// Inline button markup
-	keyboard := &types.ReplyMarkupInlineKeyboard{
-		Rows: [][]*types.KeyboardButtonInline{
-			{
-				{
-					// Text on the button and callback data
-					Text:         "Dev",
-					CallbackData: "dev_info",
-				},
-			},
-		},
-	}
+	// Use the correct inline keyboard types from your gotgproto version!
+	keyboard := ext.NewInlineKeyboardMarkup(
+		ext.NewInlineKeyboardRow(
+			ext.NewInlineKeyboardButtonData("Dev", "dev_info"),
+		),
+	)
 
-	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", &mtproto.ReplyMarkup{
-		InlineKeyboard: keyboard,
-	})
+	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", keyboard)
 	return dispatcher.EndGroups
 }
 
-// Callback handler for "Dev" button
 func callbackDev(ctx *ext.Context, u *ext.Update) error {
 	cb := u.CallbackQuery()
 	if cb == nil || cb.Data != "dev_info" {
