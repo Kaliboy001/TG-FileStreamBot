@@ -15,16 +15,18 @@ import (
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
-	dispatcher.AddHandler(handlers.NewCommand("start", start))
-	dispatcher.AddHandler(handlers.NewMessage(callbackDevFilter, devCallback))
+	dispatcher.AddHandler(handlers.NewCommand("start", startHandler))
+	// Register callback query handler using a filter
+	dispatcher.AddHandler(handlers.NewMessage(devButtonCallbackFilter, devButtonCallback))
 }
 
 // Filter for callback query with data "dev_info"
-func callbackDevFilter(u *ext.Update) bool {
+func devButtonCallbackFilter(u *ext.Update) bool {
 	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info"
 }
 
-func start(ctx *ext.Context, u *ext.Update) error {
+// /start command handler: sends greeting and inline button
+func startHandler(ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
 	if peerChatId.Type != int(storage.TypeUser) {
@@ -35,6 +37,7 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
+	// Inline keyboard with a Dev button (callback)
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
 			&tg.KeyboardButtonCallback{
@@ -54,18 +57,19 @@ func start(ctx *ext.Context, u *ext.Update) error {
 	return dispatcher.EndGroups
 }
 
-// Handle the callback query for "Dev" button
-func devCallback(ctx *ext.Context, u *ext.Update) error {
+// Handler for the callback query ("Dev" button) - sends a new message
+func devButtonCallback(ctx *ext.Context, u *ext.Update) error {
 	cb := u.CallbackQuery
 	if cb == nil {
 		return dispatcher.EndGroups
 	}
-	// Answer callback to remove the "loading..." animation (with no popup)
+
+	// Always answer callback to remove loading animation in Telegram
 	_ = ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
 		QueryID: cb.QueryID,
 	})
 
-	// Send a new message in the chat with the developer info
+	// Send a new message in the chat with developer info
 	peer := cb.Peer
 	_, err := ctx.SendMessage(peer, &tg.MessagesSendMessageRequest{
 		Peer:    peer,
