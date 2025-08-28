@@ -58,9 +58,18 @@ func handleDevCallback(ctx *ext.Context, u *ext.Update) error {
         
         // Check if this is the "dev_info" callback
         if string(callbackQuery.Data) == "dev_info" {
-                // Answer the callback query to remove the loading state
+                // Answer the callback query first (required)
                 ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
                         QueryID: callbackQuery.QueryID,
+                        Message: "",
+                })
+                
+                // Get chat ID from the callback query
+                chatId := callbackQuery.UserID
+                
+                // Send new message to the chat
+                ctx.SendMessage(chatId, &tg.MessagesSendMessageRequest{
+                        Peer:    ctx.PeerStorage.GetInputPeerById(chatId),
                         Message: "This bot developed by @Kaliboy002",
                 })
         }
