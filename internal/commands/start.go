@@ -9,6 +9,7 @@ import (
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/rpc" // Import the rpc package for RPCError
 )
 
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
@@ -70,12 +71,9 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 
 	switch callbackData {
 	case "check_membership":
-		
-		// Create a slice of InputPeer for the channel. You'll need the channel ID from your config.
-		// Replace 'YOUR_CHANNEL_ID_HERE' with the actual channel ID.
-		// For example, if your channel ID is stored in config.ValueOf.LogChannelID, use that.
-		// Note: Channel IDs from the API are usually negative.
-		channelPeer, err := ctx.ResolveUsername("KaIi_Bots") // Or use the channel ID from config.ValueOf.LogChannelID
+
+		// Resolve the channel using its username.
+		channelPeer, err := ctx.ResolveUsername("KaIi_Bots")
 		if err != nil {
 			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
 				QueryID: callbackQuery.QueryID,
@@ -84,29 +82,24 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 			})
 			return dispatcher.EndGroups
 		}
-
+		
 		// Check if the user is a member of the channel.
-		// We'll use the GetParticipant method for this.
-		// A common way to check this is to call the API method and handle the error case where the user is not found.
-		isMember := false
-		_, err = ctx.API().ChannelsGetParticipant(ctx.Context, &tg.ChannelsGetParticipantRequest{
-			Channel: channelPeer.GetInputChannel(),
-			UserID:  ctx.PeerStorage.GetInputPeerByID(userId),
+		// Use the correct API call with the `Participant` field.
+		isMember := true
+		_, err = ctx.Client.API().ChannelsGetParticipant(ctx.Context, &tg.ChannelsGetParticipantRequest{
+			Channel:     channelPeer.GetInputChannel(),
+			Participant: ctx.PeerStorage.GetInputPeerById(userId), // Use the correct method to get InputPeer
 		})
-
-		// A more reliable check would be to see if the user is a member.
-		// This can be done by checking the type of participant returned or checking for specific errors.
-		// If err is nil, it means the user is a member.
-		if err == nil {
-			isMember = true
-		} else {
-			// Specific error for not a member
-			var rpcErr tg.RPCError
-			if ext.As(&rpcErr, err) && rpcErr.Message == "PEER_ID_INVALID" {
+		
+		// Handle the case where the user is not a member.
+		var rpcErr rpc.Error
+		if err != nil && ext.As(&rpcErr, err) {
+			if rpcErr.Message == "PEER_ID_INVALID" {
 				// The user is not a participant.
 				isMember = false
 			} else {
-				// Some other error occurred. You might want to log this.
+				// Some other error occurred, log it.
+				// You can add a logging statement here for debugging.
 				isMember = false
 			}
 		}
