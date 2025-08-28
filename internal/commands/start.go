@@ -63,8 +63,12 @@ func handleDevCallback(ctx *ext.Context, u *ext.Update) error {
                         Message: "",
                 })
                 
-                // Send the developer info message
-                ctx.Reply(u, "This bot developed by @Kaliboy002", nil)
+                // Send the developer info message to the chat
+                chatId := callbackQuery.From.ID
+                ctx.SendMessage(chatId, &tg.MessagesSendMessageRequest{
+                        Peer:    ctx.PeerStorage.GetInputPeerById(chatId),
+                        Message: "This bot developed by @Kaliboy002",
+                })
         }
         
         return dispatcher.EndGroups
