@@ -11,12 +11,17 @@ import (
 	"github.com/gotd/td/tg"
 )
 
+// Register the start command and callback query handler
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
 	dispatcher.AddHandler(handlers.NewCommand("start", start))
-	// Register callback handler for the "Dev" button
-	dispatcher.AddHandler(handlers.NewCallback(devCallback, "dev_info"))
+	dispatcher.AddHandler(handlers.NewMessage(callbackDevFilter, devCallback))
+}
+
+// Filter for callback query with data "dev_info"
+func callbackDevFilter(u *ext.Update) bool {
+	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info"
 }
 
 func start(ctx *ext.Context, u *ext.Update) error {
@@ -30,7 +35,6 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// Define the inline keyboard using gotd/td/tg types
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
 			&tg.KeyboardButtonCallback{
@@ -43,7 +47,6 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		Rows: []tg.KeyboardButtonRow{row},
 	}
 
-	// Send the message with the inline button
 	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
 		Markup: markup,
 	})
@@ -51,14 +54,22 @@ func start(ctx *ext.Context, u *ext.Update) error {
 	return dispatcher.EndGroups
 }
 
+// Handle the callback query for "Dev" button
 func devCallback(ctx *ext.Context, u *ext.Update) error {
 	cb := u.CallbackQuery
-	if cb == nil || string(cb.Data) != "dev_info" {
+	if cb == nil {
 		return dispatcher.EndGroups
 	}
-	// Always answer the callback to avoid "loading" spinner in Telegram
-	ctx.AnswerCallback(cb, "")
-	// Send the developer info as a reply to the callback
-	ctx.SendMessage(cb.Peer, "This bot Developed by @Kaliboy002", nil)
-	return dispatcher.EndGroups
+	// Answer callback to remove the "loading..." animation (with no popup)
+	_ = ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
+		QueryID: cb.QueryID,
+	})
+
+	// Send a new message in the chat with the developer info
+	peer := cb.Peer
+	_, err := ctx.SendMessage(peer, &tg.MessagesSendMessageRequest{
+		Peer:    peer,
+		Message: "This bot Developed by @Kaliboy002",
+	})
+	return err
 }
