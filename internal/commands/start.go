@@ -8,7 +8,6 @@ import (
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
-	"github.com/celestix/gotgproto/dispatcher/handlers/filters"
 	"github.com/gotd/td/tg"
 )
 
@@ -20,9 +19,9 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	dispatcher.AddHandler(handlers.NewMessage(devButtonCallbackFilter, devButtonCallback))
 }
 
-// The filter must match filters.MessageFilter signature
-func devButtonCallbackFilter(ctx *ext.Context, u *ext.Update) (bool, error) {
-	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info", nil
+// The filter must match func(u *ext.Update) bool
+func devButtonCallbackFilter(u *ext.Update) bool {
+	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info"
 }
 
 // /start command handler: sends greeting and inline button
@@ -63,10 +62,12 @@ func devButtonCallback(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// Remove loading animation
-	_, _ = ctx.AnswerCallback(cb)
+	// Remove loading animation with correct request type
+	req := &tg.MessagesSetBotCallbackAnswerRequest{
+		QueryID: cb.QueryID,
+	}
+	_, _ = ctx.AnswerCallback(req)
 
-	// Send new message to the chat (use chatId and InputPeer)
 	chatId := u.EffectiveChat().GetID()
 	inputPeer := ctx.PeerStorage.GetInputPeerById(chatId)
 
