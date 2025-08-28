@@ -67,7 +67,6 @@ func helpCallback(ctx *ext.Context, u *ext.Update) error {
 		u,
 		"This bot is used to change the files or direct download streaming link with no limitations.",
 		&ext.ReplyOpts{
-			// You can use a styling option like Bold to make the text stand out.
 			ParseMode: styling.Plain,
 		},
 	)
