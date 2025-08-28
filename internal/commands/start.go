@@ -8,6 +8,7 @@ import (
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
+	"github.com/celestix/gotgproto/dispatcher/handlers/filters"
 	"github.com/gotd/td/tg"
 )
 
@@ -16,13 +17,12 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
 	dispatcher.AddHandler(handlers.NewCommand("start", startHandler))
-	// Register callback query handler using a filter
 	dispatcher.AddHandler(handlers.NewMessage(devButtonCallbackFilter, devButtonCallback))
 }
 
-// Filter for callback query with data "dev_info"
-func devButtonCallbackFilter(u *ext.Update) bool {
-	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info"
+// The filter must match filters.MessageFilter signature
+func devButtonCallbackFilter(ctx *ext.Context, u *ext.Update) (bool, error) {
+	return u.CallbackQuery != nil && string(u.CallbackQuery.Data) == "dev_info", nil
 }
 
 // /start command handler: sends greeting and inline button
@@ -37,7 +37,6 @@ func startHandler(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// Inline keyboard with a Dev button (callback)
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
 			&tg.KeyboardButtonCallback{
@@ -64,15 +63,15 @@ func devButtonCallback(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// Always answer callback to remove loading animation in Telegram
-	_ = ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
-		QueryID: cb.QueryID,
-	})
+	// Remove loading animation
+	_, _ = ctx.AnswerCallback(cb)
 
-	// Send a new message in the chat with developer info
-	peer := cb.Peer
-	_, err := ctx.SendMessage(peer, &tg.MessagesSendMessageRequest{
-		Peer:    peer,
+	// Send new message to the chat (use chatId and InputPeer)
+	chatId := u.EffectiveChat().GetID()
+	inputPeer := ctx.PeerStorage.GetInputPeerById(chatId)
+
+	_, err := ctx.SendMessage(chatId, &tg.MessagesSendMessageRequest{
+		Peer:    inputPeer,
 		Message: "This bot Developed by @Kaliboy002",
 	})
 	return err
