@@ -3,13 +3,14 @@ package commands
 import (
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
+	"context" // Import the context package
 
 	"github.com/celestix/gotgproto/dispatcher"
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
 	"github.com/gotd/td/tg"
-	"github.com/gotd/td/rpc" // Import the rpc package for RPCError
+	"github.com/gotd/td/rpc" // Import the rpc package for rpc.Error
 )
 
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
@@ -29,7 +30,7 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		ctx.Reply(u, "You are not allowed to use this bot.", nil)
 		return dispatcher.EndGroups
 	}
-
+	
 	// Show mandatory channel join message
 	showChannelJoinMessage(ctx, u)
 	return dispatcher.EndGroups
@@ -53,7 +54,7 @@ func showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
 			},
 		},
 	}
-
+	
 	ctx.Reply(u, "⚠️ To use this bot, you must first join our Telegram channels\n\nAfter successfully joining, click the 🔐 Joined button to confirm your bot membership and to continue.", &ext.ReplyOpts{
 		Markup: markup,
 	})
@@ -65,14 +66,14 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 	if callbackQuery == nil {
 		return dispatcher.EndGroups
 	}
-
+	
 	callbackData := string(callbackQuery.Data)
 	userId := callbackQuery.UserID
-
+	
 	switch callbackData {
 	case "check_membership":
-
-		// Resolve the channel using its username.
+		
+		// Resolve the channel using its username
 		channelPeer, err := ctx.ResolveUsername("KaIi_Bots")
 		if err != nil {
 			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
@@ -83,34 +84,31 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 			return dispatcher.EndGroups
 		}
 		
-		// Check if the user is a member of the channel.
-		// Use the correct API call with the `Participant` field.
+		// Check if the user is a member of the channel
 		isMember := true
-		_, err = ctx.Client.API().ChannelsGetParticipant(ctx.Context, &tg.ChannelsGetParticipantRequest{
+		_, err = ctx.API().ChannelsGetParticipant(context.Background(), &tg.ChannelsGetParticipantRequest{
 			Channel:     channelPeer.GetInputChannel(),
-			Participant: ctx.PeerStorage.GetInputPeerById(userId), // Use the correct method to get InputPeer
+			Participant: ctx.PeerStorage.GetInputPeerById(userId),
 		})
 		
-		// Handle the case where the user is not a member.
 		var rpcErr rpc.Error
-		if err != nil && ext.As(&rpcErr, err) {
+		if err != nil && rpc.As(&rpcErr, err) { // Use rpc.As instead of ext.As
 			if rpcErr.Message == "PEER_ID_INVALID" {
-				// The user is not a participant.
+				// The user is not a participant
 				isMember = false
 			} else {
-				// Some other error occurred, log it.
-				// You can add a logging statement here for debugging.
+				// Some other error occurred, you might want to log this for debugging
 				isMember = false
 			}
 		}
-
+		
 		if isMember {
 			// Answer the callback query with an empty message (no popup)
 			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
 				QueryID: callbackQuery.QueryID,
 				Message: "",
 			})
-
+			
 			// Send the welcome message with the Dev button
 			markup := &tg.ReplyInlineMarkup{
 				Rows: []tg.KeyboardButtonRow{
@@ -124,34 +122,34 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 					},
 				},
 			}
-
+			
 			ctx.SendMessage(userId, &tg.MessagesSendMessageRequest{
 				Peer:        ctx.PeerStorage.GetInputPeerById(userId),
 				Message:     "Hi, send me any file to get a direct streamable link to that file.",
 				ReplyMarkup: markup,
 			})
 		} else {
-			// User is not a member, show an alert.
+			// User is not a member, show an alert
 			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
 				QueryID: callbackQuery.QueryID,
 				Message: "⚠️ You are not a member of the channel. Please join first and then click the '🔐 Joined' button again.",
 				Alert:   true,
 			})
 		}
-
+		
 	case "dev_info":
 		// Answer the callback query first (required)
 		ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
 			QueryID: callbackQuery.QueryID,
 			Message: "",
 		})
-
+		
 		// Send new message with developer info
 		ctx.SendMessage(userId, &tg.MessagesSendMessageRequest{
 			Peer:    ctx.PeerStorage.GetInputPeerById(userId),
 			Message: "This bot developed by @Kaliboy002",
 		})
 	}
-
+	
 	return dispatcher.EndGroups
 }
