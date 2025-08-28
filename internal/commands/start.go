@@ -58,26 +58,6 @@ func showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
         })
 }
 
-func showWelcomeMessage(ctx *ext.Context, u *ext.Update) {
-        // Create inline keyboard with Dev button (same as before)
-        markup := &tg.ReplyInlineMarkup{
-                Rows: []tg.KeyboardButtonRow{
-                        {
-                                Buttons: []tg.KeyboardButtonClass{
-                                        &tg.KeyboardButtonCallback{
-                                                Text: "Dev",
-                                                Data: []byte("dev_info"),
-                                        },
-                                },
-                        },
-                },
-        }
-        
-        ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
-                Markup: markup,
-        })
-}
-
 func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
         // Get the callback query data
         callbackQuery := u.CallbackQuery
@@ -90,17 +70,31 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
         
         switch callbackData {
         case "check_membership":
-                // For now, assume user joined (you can implement real check later)
-                // This ensures the bot works without API errors
-                
-                // Answer callback and show welcome message
+                // Answer the callback query with empty message (no popup)
                 ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
                         QueryID: callbackQuery.QueryID,
-                        Message: "✅ Welcome! You can now use the bot.",
+                        Message: "",
                 })
                 
-                // Show welcome message with Dev button
-                showWelcomeMessage(ctx, u)
+                // Send NEW welcome message with Dev button
+                markup := &tg.ReplyInlineMarkup{
+                        Rows: []tg.KeyboardButtonRow{
+                                {
+                                        Buttons: []tg.KeyboardButtonClass{
+                                                &tg.KeyboardButtonCallback{
+                                                        Text: "Dev",
+                                                        Data: []byte("dev_info"),
+                                                },
+                                        },
+                                },
+                        },
+                }
+                
+                ctx.SendMessage(userId, &tg.MessagesSendMessageRequest{
+                        Peer:         ctx.PeerStorage.GetInputPeerById(userId),
+                        Message:      "Hi, send me any file to get a direct streamble link to that file.",
+                        ReplyMarkup:  markup,
+                })
                 
         case "dev_info":
                 // Answer the callback query first (required)
