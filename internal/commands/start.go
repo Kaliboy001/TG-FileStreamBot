@@ -28,6 +28,7 @@ func start(ctx *ext.Context, u *ext.Update) error {
                 ctx.Reply(u, "You are not allowed to use this bot.", nil)
                 return dispatcher.EndGroups
         }
+        
         // Create inline keyboard with Dev button
         markup := &tg.ReplyInlineMarkup{
                 Rows: []tg.KeyboardButtonRow{
@@ -60,13 +61,6 @@ func handleDevCallback(ctx *ext.Context, u *ext.Update) error {
                 // Answer the callback query to remove the loading state
                 ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
                         QueryID: callbackQuery.QueryID,
-                        Message: "",
-                })
-                
-                // Send the developer info message to the chat
-                chatId := callbackQuery.From.ID
-                ctx.SendMessage(chatId, &tg.MessagesSendMessageRequest{
-                        Peer:    ctx.PeerStorage.GetInputPeerById(chatId),
                         Message: "This bot developed by @Kaliboy002",
                 })
         }
