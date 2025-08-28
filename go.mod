@@ -6,14 +6,10 @@ require (
 	github.com/celestix/gotgproto v1.0.0-beta18
 	github.com/gin-gonic/gin v1.9.1
 	github.com/gotd/td v0.105.0
-	github.com/gotd/td/telegram/message/keyboard v0.105.0
-	github.com/gotd/td/telegram/message/styling v0.105.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/quantumsheep/range-parser v1.1.0
 	github.com/spf13/cobra v1.8.0
-	go.uber.org/zap v1.27.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
@@ -74,6 +70,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
+	go.uber.org/zap v1.27.0
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
@@ -81,5 +78,6 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0
 	google.golang.org/protobuf v1.32.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
