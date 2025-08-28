@@ -58,10 +58,13 @@ func handleDevCallback(ctx *ext.Context, u *ext.Update) error {
         // Check if this is the "dev_info" callback
         if string(callbackQuery.Data) == "dev_info" {
                 // Answer the callback query to remove the loading state
-                ctx.AnswerCallback(callbackQuery, nil)
+                ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
+                        QueryID: callbackQuery.QueryID,
+                        Message: "",
+                })
                 
                 // Send the developer info message
-                ctx.SendMessage(u.EffectiveChat().GetID(), "This bot developed by @Kaliboy002", nil)
+                ctx.Reply(u, "This bot developed by @Kaliboy002", nil)
         }
         
         return dispatcher.EndGroups
