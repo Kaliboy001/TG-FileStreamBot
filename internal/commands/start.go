@@ -8,13 +8,15 @@ import (
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
+	"github.com/gotd/td/tg"
 )
 
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
 	dispatcher.AddHandler(handlers.NewCommand("start", start))
-	dispatcher.AddHandler(handlers.NewCallback(callbackDev, "dev_info"))
+	// Register callback handler for the "Dev" button
+	dispatcher.AddHandler(handlers.NewCallback(devCallback, "dev_info"))
 }
 
 func start(ctx *ext.Context, u *ext.Update) error {
@@ -28,23 +30,35 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// Use the correct inline keyboard types from your gotgproto version!
-	keyboard := ext.NewInlineKeyboardMarkup(
-		ext.NewInlineKeyboardRow(
-			ext.NewInlineKeyboardButtonData("Dev", "dev_info"),
-		),
-	)
+	// Define the inline keyboard using gotd/td/tg types
+	row := tg.KeyboardButtonRow{
+		Buttons: []tg.KeyboardButtonClass{
+			&tg.KeyboardButtonCallback{
+				Text: "Dev",
+				Data: []byte("dev_info"),
+			},
+		},
+	}
+	markup := &tg.ReplyInlineMarkup{
+		Rows: []tg.KeyboardButtonRow{row},
+	}
 
-	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", keyboard)
+	// Send the message with the inline button
+	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
+		Markup: markup,
+	})
+
 	return dispatcher.EndGroups
 }
 
-func callbackDev(ctx *ext.Context, u *ext.Update) error {
-	cb := u.CallbackQuery()
-	if cb == nil || cb.Data != "dev_info" {
-		return nil
+func devCallback(ctx *ext.Context, u *ext.Update) error {
+	cb := u.CallbackQuery
+	if cb == nil || string(cb.Data) != "dev_info" {
+		return dispatcher.EndGroups
 	}
-	ctx.AnswerCallbackQuery(cb, nil)
-	ctx.SendMessage(cb.Message.Peer, "This bot Developed by @Kaliboy002", nil)
-	return nil
+	// Always answer the callback to avoid "loading" spinner in Telegram
+	ctx.AnswerCallback(cb, "")
+	// Send the developer info as a reply to the callback
+	ctx.SendMessage(cb.Peer, "This bot Developed by @Kaliboy002", nil)
+	return dispatcher.EndGroups
 }
