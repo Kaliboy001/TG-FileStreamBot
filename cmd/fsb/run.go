@@ -34,10 +34,10 @@ func runApp(cmd *cobra.Command, args []string) {
         mainLogger.Info("Starting server")
         config.Load(log, cmd)
         
-        // Initialize MongoDB connection
-        err := database.Connect(config.ValueOf.MongoURI, log)
+        // Initialize SQLite database connection
+        err := database.Connect(log)
         if err != nil {
-                log.Panic("Failed to connect to MongoDB", zap.Error(err))
+                log.Panic("Failed to connect to SQLite database", zap.Error(err))
         }
         defer database.Disconnect()
         
