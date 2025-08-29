@@ -10,8 +10,6 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/quantumsheep/range-parser v1.1.0
 	github.com/spf13/cobra v1.8.0
-	gorm.io/driver/sqlite v1.5.4 // Explicitly added GORM SQLite driver
-	gorm.io/gorm v1.25.11 // Existing GORM dependency
 )
 
 require (
@@ -42,6 +40,7 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
+	gorm.io/gorm v1.25.11 // indirect
 	modernc.org/libc v1.55.2 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
