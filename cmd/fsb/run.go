@@ -5,10 +5,12 @@ import (
 	"EverythingSuckz/fsb/internal/bot"
 	"EverythingSuckz/fsb/internal/cache"
 	"EverythingSuckz/fsb/internal/routes"
+	"EverythingSuckz/fsb/internal/userdb" // Import the new userdb package
 	"EverythingSuckz/fsb/internal/types"
 	"EverythingSuckz/fsb/internal/utils"
 	"fmt"
 	"net/http"
+	"os" // Import os for Exit
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,6 +34,15 @@ func runApp(cmd *cobra.Command, args []string) {
 	mainLogger := log.Named("Main")
 	mainLogger.Info("Starting server")
 	config.Load(log, cmd)
+	
+	// --- ADD THIS LINE TO INITIALIZE USERDB ---
+	if err := userdb.InitUserDB(log); err != nil {
+		mainLogger.Fatal("Failed to initialize user database", zap.Error(err))
+		os.Exit(1) // Exit if database can't be initialized
+	}
+	defer userdb.CloseUserDB(log) // Ensure database connection is closed on exit
+	// ------------------------------------------
+
 	router := getRouter(log)
 
 	mainBot, err := bot.StartClient(log)
