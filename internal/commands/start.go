@@ -2,9 +2,9 @@ package commands
 
 import (
         "EverythingSuckz/fsb/config"
+        "EverythingSuckz/fsb/internal/database"
         "EverythingSuckz/fsb/internal/utils"
         "fmt"
-        "sync/atomic"
 
         "github.com/celestix/gotgproto/dispatcher" // This is the package
         "github.com/celestix/gotgproto/dispatcher/handlers"
@@ -13,12 +13,7 @@ import (
         "github.com/gotd/td/tg"
 )
 
-// Global counter for total users. Using an atomic counter for thread safety.
-// Note: This counter will reset if the bot application restarts.
-var totalUsers int64 = 0
-
-// Track users who have already started the bot to avoid duplicate notifications
-var seenUsers = make(map[int64]bool)
+// Note: User data is now stored in MongoDB instead of memory
 
 // The Telegram User ID of the admin who will receive notifications.
 const adminID int64 = 6070733162
@@ -46,42 +41,55 @@ func (m *command) LoadStart(disp dispatcher.Dispatcher) { // Renamed parameter t
                         return dispatcher.EndGroups
                 }
                 
-                // --- New Feature: Admin Notification for New Users ---
+                // --- New Feature: Admin Notification for New Users (MongoDB) ---
                 
-                // Check if this is a first-time user
-                if !seenUsers[chatId] {
-                        // Mark this user as seen
-                        seenUsers[chatId] = true
-                        
-                        // Increment the total users count only for new users
-                        newTotalUsers := atomic.AddInt64(&totalUsers, 1)
-
-                        // Correctly get the new user's username. Provide a fallback if it's not set.
+                // Check if this is a first-time user using MongoDB
+                isUserSeen, err := database.DB.IsUserSeen(chatId)
+                if err != nil {
+                        m.log.Sugar().Errorf("Failed to check if user is seen: %v", err)
+                        // Continue with bot flow even if database check fails
+                } else if !isUserSeen {
+                        // Get user's username with fallback
                         userUsername := "N/A"
                         if u.EffectiveUser() != nil && u.EffectiveUser().Username != "" {
                                 userUsername = "@" + u.EffectiveUser().Username
                         }
+                        
+                        // Add new user to database
+                        if err := database.DB.AddUser(chatId, userUsername); err != nil {
+                                m.log.Sugar().Errorf("Failed to add user to database: %v", err)
+                        }
 
-                        // Format the notification message.
+                        // Get total user count from database
+                        totalUsers, err := database.DB.GetTotalUserCount()
+                        if err != nil {
+                                m.log.Sugar().Errorf("Failed to get total user count: %v", err)
+                                totalUsers = 0
+                        }
+
+                        // Format the notification message
                         notificationMessage := fmt.Sprintf(
                                 "➕ New User Notification ➕\n👤 User: %s\n🆔 User ID: %d\n📊 Total Users of Bot: %d",
                                 userUsername,
                                 chatId,
-                                newTotalUsers,
+                                totalUsers,
                         )
                         
-                        // Construct the tg.MessagesSendMessageRequest as required by ctx.SendMessage.
-                        // We resolve the admin's peer to ensure the message is sent correctly.
+                        // Construct the tg.MessagesSendMessageRequest as required by ctx.SendMessage
                         sendMessageRequest := &tg.MessagesSendMessageRequest{
                                 Peer:    ctx.PeerStorage.GetInputPeerById(adminID),
                                 Message: notificationMessage,
                         }
                         
-                        // Send the notification to the defined adminID.
-                        _, err := ctx.SendMessage(adminID, sendMessageRequest)
+                        // Send the notification to the defined adminID
+                        _, err = ctx.SendMessage(adminID, sendMessageRequest)
                         if err != nil {
-                                // Corrected: Use m.log.Sugar().Errorf for printf-style error logging.
                                 m.log.Sugar().Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
+                        }
+                } else {
+                        // Update last seen for existing users
+                        if err := database.DB.UpdateUserLastSeen(chatId); err != nil {
+                                m.log.Sugar().Errorf("Failed to update user last seen: %v", err)
                         }
                 }
                 
