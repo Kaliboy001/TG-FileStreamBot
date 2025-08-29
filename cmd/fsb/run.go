@@ -4,6 +4,7 @@ import (
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/bot"
 	"EverythingSuckz/fsb/internal/cache"
+	"EverythingSuckz/fsb/internal/database" // Import the new database package
 	"EverythingSuckz/fsb/internal/routes"
 	"EverythingSuckz/fsb/internal/types"
 	"EverythingSuckz/fsb/internal/utils"
@@ -33,6 +34,9 @@ func runApp(cmd *cobra.Command, args []string) {
 	mainLogger.Info("Starting server")
 	config.Load(log, cmd)
 	router := getRouter(log)
+
+	// Add this line to initialize the database
+	database.InitDB()
 
 	mainBot, err := bot.StartClient(log)
 	if err != nil {
