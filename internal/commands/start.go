@@ -59,23 +59,20 @@ func showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
 }
 
 func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
-        // Get the callback query data
         callbackQuery := u.CallbackQuery
         if callbackQuery == nil {
                 return dispatcher.EndGroups
         }
-        
+
         callbackData := string(callbackQuery.Data)
-        
+
         switch callbackData {
         case "check_membership":
-                // Answer the callback query with empty message (no popup)
                 ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
                         QueryID: callbackQuery.QueryID,
                         Message: "",
                 })
-                
-                // Create markup with Dev button
+
                 markup := &tg.ReplyInlineMarkup{
                         Rows: []tg.KeyboardButtonRow{
                                 {
@@ -88,35 +85,21 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
                                 },
                         },
                 }
-                
-                // Edit the same message instead of sending a new one
-                _, err := ctx.Client.API().MessagesEditMessage(ctx, &tg.MessagesEditMessageRequest{
-                        Peer:        callbackQuery.Peer,
-                        ID:          callbackQuery.MsgID,
-                        Message:     "Hi, send me any file to get a direct streamble link to that file.",
-                        ReplyMarkup: markup,
+
+                // EDIT the original message
+                ctx.EditMessage(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
+                        Markup: markup,
                 })
-                if err != nil {
-                        return err
-                }
-                
+
         case "dev_info":
-                // Answer the callback query first (required)
                 ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
                         QueryID: callbackQuery.QueryID,
                         Message: "",
                 })
-                
-                // Edit the message again to show developer info
-                _, err := ctx.Client.API().MessagesEditMessage(ctx, &tg.MessagesEditMessageRequest{
-                        Peer:    callbackQuery.Peer,
-                        ID:      callbackQuery.MsgID,
-                        Message: "This bot developed by @Kaliboy002",
-                })
-                if err != nil {
-                        return err
-                }
+
+                // EDIT the message again to show developer info
+                ctx.EditMessage(u, "This bot developed by @Kaliboy002", nil)
         }
-        
+
         return dispatcher.EndGroups
 }
