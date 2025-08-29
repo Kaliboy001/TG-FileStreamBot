@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/celestix/gotgproto/dispatcher"
+	"github.com/celestix/gotgproto/dispatcher" // This is the package
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
@@ -20,18 +20,22 @@ var totalUsers int64 = 0
 // The Telegram User ID of the admin who will receive notifications.
 const adminID int64 = 6070733162
 
-func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
+// LoadStart initializes the handlers for the /start command and callbacks.
+// The 'disp' parameter is the dispatcher instance.
+func (m *command) LoadStart(disp dispatcher.Dispatcher) { // Renamed parameter to 'disp'
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
 
-	// We use a closure here to correctly pass the 'm' instance
+	// Add a handler for the /start command.
+	// We use a closure here to correctly pass the 'm' instance (containing the logger)
 	// into the handler function, which allows us to use 'm.log'.
-	dispatcher.AddHandler(handlers.NewCommand("start", func(ctx *ext.Context, u *ext.Update) error {
+	disp.AddHandler(handlers.NewCommand("start", func(ctx *ext.Context, u *ext.Update) error {
 		chatId := u.EffectiveChat().GetID()
 		
 		// This line from your original code is the correct way to get the peer type.
 		peerChatId := ctx.PeerStorage.GetPeerById(chatId)
 		if peerChatId.Type != int(storage.TypeUser) {
+			// Now 'dispatcher.EndGroups' correctly refers to the package constant.
 			return dispatcher.EndGroups
 		}
 		if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
@@ -58,7 +62,8 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 			newTotalUsers,
 		)
 		
-		// Construct the tg.MessagesSendMessageRequest as required by ctx.SendMessage
+		// Construct the tg.MessagesSendMessageRequest as required by ctx.SendMessage.
+		// We resolve the admin's peer to ensure the message is sent correctly.
 		sendMessageRequest := &tg.MessagesSendMessageRequest{
 			Peer:    ctx.PeerStorage.GetInputPeerById(adminID),
 			Message: notificationMessage,
@@ -67,7 +72,7 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 		// Send the notification to the defined adminID.
 		_, err := ctx.SendMessage(adminID, sendMessageRequest)
 		if err != nil {
-			// Corrected: Use m.log.Sugar().Errorf for printf-style error logging
+			// Corrected: Use m.log.Sugar().Errorf for printf-style error logging.
 			m.log.Sugar().Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
 		}
 		
@@ -78,11 +83,13 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 		return dispatcher.EndGroups
 	}))
 
-	dispatcher.AddHandler(handlers.NewCallbackQuery(nil, handleCallbacks))
+	// Add a handler for callback queries.
+	disp.AddHandler(handlers.NewCallbackQuery(nil, handleCallbacks))
 }
 
+// showChannelJoinMessage sends a message prompting the user to join a channel.
 func showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
-	// Create inline keyboard with Join Channel and Joined buttons
+	// Create inline keyboard with Join Channel and Joined buttons.
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{
 			{
@@ -105,9 +112,11 @@ func showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
 	})
 }
 
+// handleCallbacks processes incoming callback queries.
 func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 	callbackQuery := u.CallbackQuery
 	if callbackQuery == nil {
+		// Now 'dispatcher.EndGroups' correctly refers to the package constant.
 		return dispatcher.EndGroups
 	}
 
@@ -134,7 +143,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 			},
 		}
 
-		// Edit the same message
+		// Edit the same message to greet the user.
 		_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
 			Peer:        ctx.PeerStorage.GetInputPeerById(chatID),
 			ID:          callbackQuery.MsgID,
@@ -151,7 +160,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 			Message: "",
 		})
 
-		// Edit again with developer info
+		// Edit again with developer information.
 		_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
 			Peer:    ctx.PeerStorage.GetInputPeerById(chatID),
 			ID:      callbackQuery.MsgID,
