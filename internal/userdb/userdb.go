@@ -80,17 +80,3 @@ func SaveUser(log *zap.Logger, userID int64) error {
 	log.Sugar().Infof("Successfully saved user %d to database", userID)
 	return nil
 }
-
-// IsUserMemberOfChannel checks if a user is a member of the channel
-// This function will remain in your commands/start.go as it uses Telegram API directly.
-// This function is illustrative for the userdb package, but actual channel membership check
-// is better performed using Telegram API calls directly in the command handler.
-/*
-func IsUserMemberOfChannel(log *zap.Logger, userID int64, channelID int64) (bool, error) {
-	// This would involve Telegram API calls, not direct database lookup.
-	// Placeholder for demonstration:
-	log.Sugar().Infof("Checking if user %d is member of channel %d (placeholder)", userID, channelID)
-	// In a real scenario, this would use ctx.API().ChannelsGetParticipant
-	return true, nil // Always true for demonstration
-}
-*/
