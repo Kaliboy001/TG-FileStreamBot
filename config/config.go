@@ -38,19 +38,20 @@ func (au *allowedUsers) Decode(value string) error {
 }
 
 type config struct {
-	ApiID          int32        `envconfig:"API_ID" required:"true"`
-	ApiHash        string       `envconfig:"API_HASH" required:"true"`
-	BotToken       string       `envconfig:"BOT_TOKEN" required:"true"`
-	LogChannelID   int64        `envconfig:"LOG_CHANNEL" required:"true"`
-	Dev            bool         `envconfig:"DEV" default:"false"`
-	Port           int          `envconfig:"PORT" default:"8080"`
-	Host           string       `envconfig:"HOST" default:""`
-	HashLength     int          `envconfig:"HASH_LENGTH" default:"6"`
-	UseSessionFile bool         `envconfig:"USE_SESSION_FILE" default:"true"`
-	UserSession    string       `envconfig:"USER_SESSION"`
-	UsePublicIP    bool         `envconfig:"USE_PUBLIC_IP" default:"false"`
-	AllowedUsers   allowedUsers `envconfig:"ALLOWED_USERS"`
-	MultiTokens    []string
+        ApiID          int32        `envconfig:"API_ID" required:"true"`
+        ApiHash        string       `envconfig:"API_HASH" required:"true"`
+        BotToken       string       `envconfig:"BOT_TOKEN" required:"true"`
+        LogChannelID   int64        `envconfig:"LOG_CHANNEL" required:"true"`
+        Dev            bool         `envconfig:"DEV" default:"false"`
+        Port           int          `envconfig:"PORT" default:"8080"`
+        Host           string       `envconfig:"HOST" default:""`
+        HashLength     int          `envconfig:"HASH_LENGTH" default:"6"`
+        UseSessionFile bool         `envconfig:"USE_SESSION_FILE" default:"true"`
+        UserSession    string       `envconfig:"USER_SESSION"`
+        UsePublicIP    bool         `envconfig:"USE_PUBLIC_IP" default:"false"`
+        AllowedUsers   allowedUsers `envconfig:"ALLOWED_USERS"`
+        MongoURI       string       `envconfig:"MONGO_URI" required:"true"`
+        MultiTokens    []string
 }
 
 var botTokenRegex = regexp.MustCompile(`MULTI\_TOKEN\d+=(.*)`)
