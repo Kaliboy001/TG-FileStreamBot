@@ -9,7 +9,8 @@ import (
 	"github.com/celestix/gotgproto/dispatcher"
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
-	"github.com/gotd/td/tg" // Make sure tg is imported
+	"github.com/celestix/gotgproto/storage" // Re-imported storage for TypeUser
+	"github.com/gotd/td/tg"                // Make sure tg is imported
 )
 
 // Global counter for total users. Use atomic operations for thread safety.
@@ -32,8 +33,8 @@ func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 // Modified start function to accept the 'command' struct for logging
 func start(m *command, ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
-	// PeerStorage from ctx is no longer used for type checking as EffectiveChat().GetType() gives this
-	if u.EffectiveChat().GetType() != tg.ChatTypeUser { // Use tg.ChatTypeUser directly
+	// Corrected: Use u.EffectiveChat().Chat.Type and compare with int(storage.TypeUser)
+	if u.EffectiveChat().Chat.Type != int(storage.TypeUser) {
 		return dispatcher.EndGroups
 	}
 	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
@@ -69,8 +70,8 @@ func start(m *command, ctx *ext.Context, u *ext.Update) error {
 	// Send the notification to the defined adminID.
 	_, err := ctx.SendMessage(adminID, sendMessageRequest)
 	if err != nil {
-		// Log the error using the 'm.log' from the command struct.
-		m.log.Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
+		// Corrected: Use m.log.Sugar().Errorf for printf-style error logging
+		m.log.Sugar().Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
 	}
 
 	// --- End of New Feature ---
@@ -131,6 +132,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 					},
 				},
 			},
+		},
 		}
 
 		// Edit the same message
