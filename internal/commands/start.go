@@ -4,34 +4,37 @@ import (
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/userdb" // Import the new userdb package
 	"EverythingSuckz/fsb/internal/utils"
-	"context" // This import might still be needed for context.Background() in API calls.
+	"context" // This import is needed for context.Background() in API calls.
 	"go.uber.org/zap"
 
 	"github.com/celestix/gotgproto/dispatcher"
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
-	"github.com/gotd/td/rpc" // Keep if rpc.As is used in channel membership check
+	"github.com/gotd/td/rpc" // Import for rpc.Error and rpc.As
 	"github.com/gotd/td/tg"
 )
 
-// Assuming 'command' struct is defined in another file, e.g., internal/commands/commands.go
-// Example (DO NOT put this in start.go, it's just for reference):
-// type command struct {
-// 	log *zap.Logger
-// }
-// func NewCommand(log *zap.Logger) *command {
-// 	return &command{log: log}
-// }
+// The 'command' struct is assumed to be defined in another file,
+// e.g., internal/commands/commands.go, and holds the logger instance.
+type command struct {
+	log *zap.Logger
+}
 
+// NewCommand is a constructor for the command struct.
+func NewCommand(log *zap.Logger) *command {
+	return &command{log: log}
+}
 
+// LoadStart registers the /start command and callback query handler.
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
-	dispatcher.AddHandler(handlers.NewCommand("start", m.start)) // Use m.start
-	dispatcher.AddHandler(handlers.NewCallbackQuery(nil, m.handleCallbacks)) // Use m.handleCallbacks
+	dispatcher.AddHandler(handlers.NewCommand("start", m.start))
+	dispatcher.AddHandler(handlers.NewCallbackQuery(nil, m.handleCallbacks))
 }
 
+// start handles the /start command.
 func (m *command) start(ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
@@ -43,19 +46,19 @@ func (m *command) start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// --- ADD THIS LINE TO SAVE THE USER TO THE SQLITE DATABASE ---
-	if err := userdb.SaveUser(m.log, chatId); err != nil { // Use m.log
-		m.log.Error("Failed to save user ID to database", zap.Error(err)) // Use m.log
+	// --- Save the user's ID to the SQLite database ---
+	if err := userdb.SaveUser(m.log, chatId); err != nil {
+		m.log.Error("Failed to save user ID to database", zap.Error(err))
 	}
-	// -----------------------------------------------------------
+	// ---------------------------------------------------
 
 	// Show mandatory channel join message
-	m.showChannelJoinMessage(ctx, u) // Use m.showChannelJoinMessage
+	m.showChannelJoinMessage(ctx, u)
 	return dispatcher.EndGroups
 }
 
+// showChannelJoinMessage sends the initial message with channel join buttons.
 func (m *command) showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
-	// Create inline keyboard with Join Channel and Joined buttons
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{
 			{
@@ -78,6 +81,7 @@ func (m *command) showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
 	})
 }
 
+// handleCallbacks processes inline keyboard button presses.
 func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 	callbackQuery := u.CallbackQuery
 	if callbackQuery == nil {
@@ -86,8 +90,8 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 
 	callbackData := string(callbackQuery.Data)
 	chatID := callbackQuery.UserID
-
-	// Use callbackQuery.MsgID directly for editing the message.
+	
+	// Use the message ID from the callback query as it refers to the message that generated the callback.
 	messageID := callbackQuery.MsgID
 
 	switch callbackData {
@@ -105,19 +109,19 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 
 		// Check if the user is a member of the channel
 		isMember := true
-		_, err = ctx.API().ChannelsGetParticipant(context.Background(), &tg.ChannelsGetParticipantRequest{
+		_, err = ctx.Client.API().ChannelsGetParticipant(context.Background(), &tg.ChannelsGetParticipantRequest{ // Corrected: ctx.Client.API()
 			Channel:     channelPeer.GetInputChannel(),
-			Participant: ctx.PeerStorage.GetInputPeerById(chatID), // Use chatID consistently for user
+			Participant: ctx.PeerStorage.GetInputPeerById(chatID),
 		})
 
 		var rpcErr rpc.Error
-		if err != nil && rpc.As(&rpcErr, err) { // Use rpc.As for error type assertion
+		if err != nil && rpc.As(&rpcErr, err) { // Corrected: rpc.As for error type assertion
 			if rpcErr.Message == "PEER_ID_INVALID" {
 				// The user is not a participant
 				isMember = false
 			} else {
-				// Some other error occurred, you might want to log this for debugging
-				m.log.Error("Error checking channel membership", zap.Error(err)) // Use m.log
+				// Some other error occurred, log it for debugging
+				m.log.Error("Error checking channel membership", zap.Error(err))
 				isMember = false
 			}
 		}
@@ -129,7 +133,7 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 				Message: "",
 			})
 
-			// Edit the existing message instead of sending a new one
+			// Edit the existing message to show the welcome message and Dev button
 			markup := &tg.ReplyInlineMarkup{
 				Rows: []tg.KeyboardButtonRow{
 					{
@@ -143,7 +147,6 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 				},
 			}
 
-			// Corrected EditMessage call using callbackQuery.MsgID
 			_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
 				ID:          messageID,
 				Peer:        ctx.PeerStorage.GetInputPeerById(chatID),
@@ -151,7 +154,7 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 				ReplyMarkup: markup,
 			})
 			if err != nil {
-				m.log.Error("Failed to edit message with welcome", zap.Error(err)) // Use m.log
+				m.log.Error("Failed to edit message with welcome", zap.Error(err))
 				return err
 			}
 		} else {
@@ -170,14 +173,14 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 			Message: "",
 		})
 
-		// Edit the existing message with new content
+		// Edit the existing message with developer info
 		_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
 			ID:      messageID,
 			Peer:    ctx.PeerStorage.GetInputPeerById(chatID),
 			Message: "This bot developed by @Kaliboy002",
 		})
 		if err != nil {
-			m.log.Error("Failed to edit message with dev info", zap.Error(err)) // Use m.log
+			m.log.Error("Failed to edit message with dev info", zap.Error(err))
 			return err
 		}
 	}
