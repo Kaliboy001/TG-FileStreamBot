@@ -65,6 +65,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
         }
 
         callbackData := string(callbackQuery.Data)
+        chatID := callbackQuery.UserID
 
         switch callbackData {
         case "check_membership":
@@ -86,10 +87,16 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
                         },
                 }
 
-                // EDIT the original message
-                ctx.EditMessage(u, "Hi, send me any file to get a direct streamble link to that file.", &ext.ReplyOpts{
-                        Markup: markup,
+                // Edit the same message
+                _, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
+                        Peer:        ctx.PeerStorage.GetInputPeerById(chatID),
+                        ID:          callbackQuery.MsgID,
+                        Message:     "Hi, send me any file to get a direct streamble link to that file.",
+                        ReplyMarkup: markup,
                 })
+                if err != nil {
+                        return err
+                }
 
         case "dev_info":
                 ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
@@ -97,8 +104,15 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
                         Message: "",
                 })
 
-                // EDIT the message again to show developer info
-                ctx.EditMessage(u, "This bot developed by @Kaliboy002", nil)
+                // Edit again with developer info
+                _, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
+                        Peer:    ctx.PeerStorage.GetInputPeerById(chatID),
+                        ID:      callbackQuery.MsgID,
+                        Message: "This bot developed by @Kaliboy002",
+                })
+                if err != nil {
+                        return err
+                }
         }
 
         return dispatcher.EndGroups
