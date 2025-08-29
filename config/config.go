@@ -73,18 +73,19 @@ func (c *config) loadFromEnvFile(log *zap.Logger) {
 }
 
 func SetFlagsFromConfig(cmd *cobra.Command) {
-	cmd.Flags().Int32("api-id", ValueOf.ApiID, "Telegram API ID")
-	cmd.Flags().String("api-hash", ValueOf.ApiHash, "Telegram API Hash")
-	cmd.Flags().String("bot-token", ValueOf.BotToken, "Telegram Bot Token")
-	cmd.Flags().Int64("log-channel", ValueOf.LogChannelID, "Telegram Log Channel ID")
-	cmd.Flags().Bool("dev", ValueOf.Dev, "Enable development mode")
-	cmd.Flags().IntP("port", "p", ValueOf.Port, "Server port")
-	cmd.Flags().String("host", ValueOf.Host, "Server host that will be included in links")
-	cmd.Flags().Int("hash-length", ValueOf.HashLength, "Hash length in links")
-	cmd.Flags().Bool("use-session-file", ValueOf.UseSessionFile, "Use session files")
-	cmd.Flags().String("user-session", ValueOf.UserSession, "Pyrogram user session")
-	cmd.Flags().Bool("use-public-ip", ValueOf.UsePublicIP, "Use public IP instead of local IP")
-	cmd.Flags().String("multi-token-txt-file", "", "Multi token txt file (Not implemented)")
+        cmd.Flags().Int32("api-id", ValueOf.ApiID, "Telegram API ID")
+        cmd.Flags().String("api-hash", ValueOf.ApiHash, "Telegram API Hash")
+        cmd.Flags().String("bot-token", ValueOf.BotToken, "Telegram Bot Token")
+        cmd.Flags().Int64("log-channel", ValueOf.LogChannelID, "Telegram Log Channel ID")
+        cmd.Flags().Bool("dev", ValueOf.Dev, "Enable development mode")
+        cmd.Flags().IntP("port", "p", ValueOf.Port, "Server port")
+        cmd.Flags().String("host", ValueOf.Host, "Server host that will be included in links")
+        cmd.Flags().Int("hash-length", ValueOf.HashLength, "Hash length in links")
+        cmd.Flags().Bool("use-session-file", ValueOf.UseSessionFile, "Use session files")
+        cmd.Flags().String("user-session", ValueOf.UserSession, "Pyrogram user session")
+        cmd.Flags().Bool("use-public-ip", ValueOf.UsePublicIP, "Use public IP instead of local IP")
+        cmd.Flags().String("mongo-uri", ValueOf.MongoURI, "MongoDB connection URI")
+        cmd.Flags().String("multi-token-txt-file", "", "Multi token txt file (Not implemented)")
 }
 
 func (c *config) loadConfigFromArgs(log *zap.Logger, cmd *cobra.Command) {
