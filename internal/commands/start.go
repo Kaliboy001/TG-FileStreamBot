@@ -2,40 +2,33 @@ package commands
 
 import (
 	"EverythingSuckz/fsb/config"
-	"EverythingSuckz/fsb/internal/userdb" // Import the new userdb package
 	"EverythingSuckz/fsb/internal/utils"
-	"context" // This import is needed for context.Background() in API calls.
-	"go.uber.org/zap"
+	"fmt"          // Added for string formatting
+	"sync/atomic"  // Added for atomic counter
 
 	"github.com/celestix/gotgproto/dispatcher"
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
-	"github.com/gotd/td/rpc" // Import for rpc.Error and rpc.As
 	"github.com/gotd/td/tg"
 )
 
-// The 'command' struct is assumed to be defined in another file,
-// e.g., internal/commands/commands.go, and holds the logger instance.
-type command struct {
-	log *zap.Logger
-}
+// Global counter for total users. Use atomic operations for thread safety.
+// Note: This counter will reset if the bot application restarts.
+// For persistent storage of user counts, a database would be required.
+var totalUsers int64 = 0
 
-// NewCommand is a constructor for the command struct.
-func NewCommand(log *zap.Logger) *command {
-	return &command{log: log}
-}
+// The Telegram User ID of the admin who will receive notifications.
+const adminID int64 = 6070733162
 
-// LoadStart registers the /start command and callback query handler.
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
-	dispatcher.AddHandler(handlers.NewCommand("start", m.start))
-	dispatcher.AddHandler(handlers.NewCallbackQuery(nil, m.handleCallbacks))
+	dispatcher.AddHandler(handlers.NewCommand("start", start))
+	dispatcher.AddHandler(handlers.NewCallbackQuery(nil, handleCallbacks))
 }
 
-// start handles the /start command.
-func (m *command) start(ctx *ext.Context, u *ext.Update) error {
+func start(ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
 	if peerChatId.Type != int(storage.TypeUser) {
@@ -46,19 +39,45 @@ func (m *command) start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 
-	// --- Save the user's ID to the SQLite database ---
-	if err := userdb.SaveUser(m.log, chatId); err != nil {
-		m.log.Error("Failed to save user ID to database", zap.Error(err))
+	// --- New Feature: Admin Notification for New Users ---
+
+	// Atomically increment the total users count.
+	newTotalUsers := atomic.AddInt64(&totalUsers, 1)
+
+	// Get the new user's username. Provide a fallback if it's not set.
+	userUsername := u.EffectiveChat().GetUsername()
+	if userUsername == "" {
+		userUsername = "N/A"
+	} else {
+		userUsername = "@" + userUsername // Prepend "@" for a more readable format.
 	}
-	// ---------------------------------------------------
+
+	// Format the notification message.
+	notificationMessage := fmt.Sprintf(
+		"➕ New User Notification ➕\n👤 User: %s\n🆔 User ID: %d\n📊 Total Users of Bot: %d",
+		userUsername,
+		chatId,
+		newTotalUsers,
+	)
+
+	// Send the notification to the defined adminID.
+	// We use ctx.SendMessage as it's for sending to a specific chat, not replying to the current user.
+	_, err := ctx.SendMessage(adminID, notificationMessage, nil)
+	if err != nil {
+		// Log the error if the notification fails to send, but do not prevent the
+		// user from interacting with the bot. This ensures the bot remains functional.
+		ctx.Log.Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
+	}
+
+	// --- End of New Feature ---
 
 	// Show mandatory channel join message
-	m.showChannelJoinMessage(ctx, u)
+	showChannelJoinMessage(ctx, u)
 	return dispatcher.EndGroups
 }
 
-// showChannelJoinMessage sends the initial message with channel join buttons.
-func (m *command) showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
+func showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
+	// Create inline keyboard with Join Channel and Joined buttons
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{
 			{
@@ -81,8 +100,7 @@ func (m *command) showChannelJoinMessage(ctx *ext.Context, u *ext.Update) {
 	})
 }
 
-// handleCallbacks processes inline keyboard button presses.
-func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
+func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 	callbackQuery := u.CallbackQuery
 	if callbackQuery == nil {
 		return dispatcher.EndGroups
@@ -90,97 +108,51 @@ func (m *command) handleCallbacks(ctx *ext.Context, u *ext.Update) error {
 
 	callbackData := string(callbackQuery.Data)
 	chatID := callbackQuery.UserID
-	
-	// Use the message ID from the callback query as it refers to the message that generated the callback.
-	messageID := callbackQuery.MsgID
 
 	switch callbackData {
 	case "check_membership":
-		// Resolve the channel using its username
-		channelPeer, err := ctx.ResolveUsername("KaIi_Bots")
-		if err != nil {
-			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
-				QueryID: callbackQuery.QueryID,
-				Message: "Error: Could not resolve channel.",
-				Alert:   true,
-			})
-			return dispatcher.EndGroups
-		}
-
-		// Check if the user is a member of the channel
-		isMember := true
-		_, err = ctx.Client.API().ChannelsGetParticipant(context.Background(), &tg.ChannelsGetParticipantRequest{ // Corrected: ctx.Client.API()
-			Channel:     channelPeer.GetInputChannel(),
-			Participant: ctx.PeerStorage.GetInputPeerById(chatID),
-		})
-
-		var rpcErr rpc.Error
-		if err != nil && rpc.As(&rpcErr, err) { // Corrected: rpc.As for error type assertion
-			if rpcErr.Message == "PEER_ID_INVALID" {
-				// The user is not a participant
-				isMember = false
-			} else {
-				// Some other error occurred, log it for debugging
-				m.log.Error("Error checking channel membership", zap.Error(err))
-				isMember = false
-			}
-		}
-
-		if isMember {
-			// Answer the callback query with an empty message (no popup)
-			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
-				QueryID: callbackQuery.QueryID,
-				Message: "",
-			})
-
-			// Edit the existing message to show the welcome message and Dev button
-			markup := &tg.ReplyInlineMarkup{
-				Rows: []tg.KeyboardButtonRow{
-					{
-						Buttons: []tg.KeyboardButtonClass{
-							&tg.KeyboardButtonCallback{
-								Text: "Dev",
-								Data: []byte("dev_info"),
-							},
-						},
-					},
-				},
-			}
-
-			_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
-				ID:          messageID,
-				Peer:        ctx.PeerStorage.GetInputPeerById(chatID),
-				Message:     "Hi, send me any file to get a direct streamble link to that file.",
-				ReplyMarkup: markup,
-			})
-			if err != nil {
-				m.log.Error("Failed to edit message with welcome", zap.Error(err))
-				return err
-			}
-		} else {
-			// User is not a member, show an alert
-			ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
-				QueryID: callbackQuery.QueryID,
-				Message: "⚠️ You are not a member of the channel. Please join first and then click the '🔐 Joined' button again.",
-				Alert:   true,
-			})
-		}
-
-	case "dev_info":
-		// Answer the callback query first (required)
 		ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
 			QueryID: callbackQuery.QueryID,
 			Message: "",
 		})
 
-		// Edit the existing message with developer info
+		markup := &tg.ReplyInlineMarkup{
+			Rows: []tg.KeyboardButtonRow{
+				{
+					Buttons: []tg.KeyboardButtonClass{
+						&tg.KeyboardButtonCallback{
+							Text: "Dev",
+							Data: []byte("dev_info"),
+						},
+					},
+				},
+			},
+		}
+
+		// Edit the same message
 		_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
-			ID:      messageID,
+			Peer:        ctx.PeerStorage.GetInputPeerById(chatID),
+			ID:          callbackQuery.MsgID,
+			Message:     "Hi, send me any file to get a direct streamble link to that file.",
+			ReplyMarkup: markup,
+		})
+		if err != nil {
+			return err
+		}
+
+	case "dev_info":
+		ctx.AnswerCallback(&tg.MessagesSetBotCallbackAnswerRequest{
+			QueryID: callbackQuery.QueryID,
+			Message: "",
+		})
+
+		// Edit again with developer info
+		_, err := ctx.EditMessage(chatID, &tg.MessagesEditMessageRequest{
 			Peer:    ctx.PeerStorage.GetInputPeerById(chatID),
+			ID:      callbackQuery.MsgID,
 			Message: "This bot developed by @Kaliboy002",
 		})
 		if err != nil {
-			m.log.Error("Failed to edit message with dev info", zap.Error(err))
 			return err
 		}
 	}
