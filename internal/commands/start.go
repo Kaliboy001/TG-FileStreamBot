@@ -68,6 +68,9 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
         callbackData := string(callbackQuery.Data)
         userId := callbackQuery.UserID
         
+        // Get the message ID of the message to be edited from the callback query
+        messageID := callbackQuery.Message.GetID()
+        
         switch callbackData {
         case "check_membership":
                 // Answer the callback query with empty message (no popup)
@@ -76,7 +79,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
                         Message: "",
                 })
                 
-                // Send NEW welcome message with Dev button
+                // Edit the existing message instead of sending a new one
                 markup := &tg.ReplyInlineMarkup{
                         Rows: []tg.KeyboardButtonRow{
                                 {
@@ -90,7 +93,7 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
                         },
                 }
                 
-                ctx.SendMessage(userId, &tg.MessagesSendMessageRequest{
+                ctx.EditMessage(userId, messageID, &tg.MessagesEditMessageRequest{
                         Peer:         ctx.PeerStorage.GetInputPeerById(userId),
                         Message:      "Hi, send me any file to get a direct streamble link to that file.",
                         ReplyMarkup:  markup,
@@ -103,8 +106,8 @@ func handleCallbacks(ctx *ext.Context, u *ext.Update) error {
                         Message: "",
                 })
                 
-                // Send new message with developer info
-                ctx.SendMessage(userId, &tg.MessagesSendMessageRequest{
+                // Edit the existing message with new content
+                ctx.EditMessage(userId, messageID, &tg.MessagesEditMessageRequest{
                         Peer:    ctx.PeerStorage.GetInputPeerById(userId),
                         Message: "This bot developed by @Kaliboy002",
                 })
