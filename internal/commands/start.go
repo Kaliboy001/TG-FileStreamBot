@@ -3,14 +3,13 @@ package commands
 import (
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
-	"fmt"          // Added for string formatting
-	"sync/atomic"  // Added for atomic counter
+	"fmt"
+	"sync/atomic"
 
 	"github.com/celestix/gotgproto/dispatcher"
 	"github.com/celestix/gotgproto/dispatcher/handlers"
 	"github.com/celestix/gotgproto/ext"
-	"github.com/celestix/gotgproto/storage"
-	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tg" // Make sure tg is imported
 )
 
 // Global counter for total users. Use atomic operations for thread safety.
@@ -24,14 +23,17 @@ const adminID int64 = 6070733162
 func (m *command) LoadStart(dispatcher dispatcher.Dispatcher) {
 	log := m.log.Named("start")
 	defer log.Sugar().Info("Loaded")
-	dispatcher.AddHandler(handlers.NewCommand("start", start))
+	dispatcher.AddHandler(handlers.NewCommand("start", func(ctx *ext.Context, u *ext.Update) error {
+		return start(m, ctx, u) // Pass 'm' here
+	}))
 	dispatcher.AddHandler(handlers.NewCallbackQuery(nil, handleCallbacks))
 }
 
-func start(ctx *ext.Context, u *ext.Update) error {
+// Modified start function to accept the 'command' struct for logging
+func start(m *command, ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
-	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
-	if peerChatId.Type != int(storage.TypeUser) {
+	// PeerStorage from ctx is no longer used for type checking as EffectiveChat().GetType() gives this
+	if u.EffectiveChat().GetType() != tg.ChatTypeUser { // Use tg.ChatTypeUser directly
 		return dispatcher.EndGroups
 	}
 	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
@@ -45,11 +47,9 @@ func start(ctx *ext.Context, u *ext.Update) error {
 	newTotalUsers := atomic.AddInt64(&totalUsers, 1)
 
 	// Get the new user's username. Provide a fallback if it's not set.
-	userUsername := u.EffectiveChat().GetUsername()
-	if userUsername == "" {
-		userUsername = "N/A"
-	} else {
-		userUsername = "@" + userUsername // Prepend "@" for a more readable format.
+	userUsername := "N/A"
+	if u.EffectiveUser() != nil && u.EffectiveUser().Username != "" { // Correctly access username from EffectiveUser
+		userUsername = "@" + u.EffectiveUser().Username
 	}
 
 	// Format the notification message.
@@ -60,13 +60,17 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		newTotalUsers,
 	)
 
+	// Construct the tg.MessagesSendMessageRequest as required by ctx.SendMessage
+	sendMessageRequest := &tg.MessagesSendMessageRequest{
+		Peer:    ctx.PeerStorage.GetInputPeerById(adminID), // Get InputPeer for adminID
+		Message: notificationMessage,
+	}
+
 	// Send the notification to the defined adminID.
-	// We use ctx.SendMessage as it's for sending to a specific chat, not replying to the current user.
-	_, err := ctx.SendMessage(adminID, notificationMessage, nil)
+	_, err := ctx.SendMessage(adminID, sendMessageRequest)
 	if err != nil {
-		// Log the error if the notification fails to send, but do not prevent the
-		// user from interacting with the bot. This ensures the bot remains functional.
-		ctx.Log.Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
+		// Log the error using the 'm.log' from the command struct.
+		m.log.Errorf("Failed to send new user notification to admin (%d): %v", adminID, err)
 	}
 
 	// --- End of New Feature ---
